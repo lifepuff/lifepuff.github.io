@@ -1,0 +1,53 @@
+/* Lo mínimo para que las dos páginas de LifePuff en la web se parezcan a la app. */
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+  background: #F7F3EA; color: #213129;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.caja {
+  width: 100%; max-width: 430px; background: #FFFCF6;
+  border: 1px solid #E5E0D7; border-radius: 26px; padding: 28px 26px;
+}
+
+.marca { font-size: 13px; font-weight: 800; letter-spacing: .5px; color: #4E7659; margin-bottom: 14px; }
+h1 { font-size: 22px; line-height: 1.25; margin: 0 0 8px; }
+.ayuda { font-size: 13.5px; line-height: 1.55; color: #718077; margin: 0 0 18px; }
+
+.nota {
+  font-size: 12px; line-height: 1.6; color: #718077; background: #EFEFE6;
+  border-radius: 14px; padding: 12px 14px; margin: 4px 0 18px; overflow-wrap: anywhere;
+}
+
+.error {
+  font-size: 13px; line-height: 1.5; color: #8E3B3B; background: #FDF2F2;
+  border: 1px solid #E7C6C6; border-radius: 12px; padding: 11px 13px; margin: 0 0 16px;
+}
+
+label { display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 12px; }
+
+input {
+  display: block; width: 100%; margin-top: 6px; padding: 13px 14px;
+  font-size: 16px; /* menos de 16 y el iPhone hace zoom solo al escribir */
+  color: #213129; background: #fff; border: 1px solid #E5E0D7; border-radius: 14px;
+}
+input:focus { outline: 2px solid #4E7659; outline-offset: 1px; }
+
+.boton {
+  display: block; width: 100%; margin-top: 10px; padding: 15px;
+  font-size: 15px; font-weight: 800; font-family: inherit; text-align: center;
+  text-decoration: none; cursor: pointer; color: #fff;
+  background: #31543C; border: 1px solid #31543C; border-radius: 999px;
+}
+.boton:disabled { opacity: .6; cursor: default; }
+.boton.secundario { color: #31543C; background: transparent; border-color: #D8D2C6; }
+
+.separador { display: flex; align-items: center; gap: 10px; margin: 18px 0 14px; font-size: 11.5px; color: #9AA69C; }
+.separador::before, .separador::after { content: ""; flex: 1; height: 1px; background: #E5E0D7; }
+
+.lista { margin: 0 0 16px; }
+.fila { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; padding: 7px 0; }
+.tic { color: #31543C; font-weight: 900; }

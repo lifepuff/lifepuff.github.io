@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Abrir LifePuff</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<main class="caja">
+  <div class="marca">LifePuff</div>
+  <h1 id="titulo">Abriendo la app…</h1>
+  <p class="ayuda" id="ayuda">Si no se abre sola, toca el botón.</p>
+  <a id="ir" class="boton" href="lifepuff://auth-callback">Abrir LifePuff</a>
+</main>
+
+<script>
+// Esta página existe por una sola razón: Supabase manda los enlaces de los
+// correos (confirmar la cuenta, recuperar la contraseña) a una dirección web,
+// y la app vive en lifepuff://auth-callback, que un navegador no sabe abrir.
+// Aquí se recoge el enlace y se le pasa a la app tal cual venía.
+//
+// El trozo de después de la almohadilla nunca llega al servidor, así que el
+// reenvío tiene que hacerse desde el navegador, como se hace aquí.
+(function () {
+  var APP = 'lifepuff://auth-callback';
+  var extra = location.search + location.hash;
+  var destino = APP + extra;
+  document.getElementById('ir').href = destino;
+
+  if (extra.length > 1) {
+    location.replace(destino);
+  } else {
+    // Alguien ha entrado a pelo, sin nada que reenviar. Mandarle a la app sin
+    // datos solo le daría un error, así que se le explica dónde está.
+    document.getElementById('titulo').textContent = 'Esta página abre la app';
+    document.getElementById('ayuda').textContent =
+      'Solo funciona desde los enlaces que LifePuff te manda por correo.';
+  }
+})();
+</script>
+</body>
+</html>
