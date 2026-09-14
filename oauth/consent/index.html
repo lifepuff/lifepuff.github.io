@@ -148,17 +148,56 @@ async function pideConsentimiento() {
   };
   ({ data: { user: usuario } } = await supabase.auth.getUser());
 
+  // De dónde salió esta app: la creó el dueño del proyecto, o se registró sola
+  // por la puerta pública. Es la diferencia entre un conocido y un desconocido,
+  // y cambia todo lo que viene debajo.
+  let ficha = null;
+  try {
+    const { data } = await supabase.rpc('oauth_cliente_info', { p_client_id: cliente.id });
+    ficha = Array.isArray(data) ? data[0] : data;
+  } catch { /* si no se puede saber, se trata como desconocida */ }
+
+  const deConfianza = ficha?.registro === 'manual';
+
+  // Un desconocido que se llama como la casa. Ese es el engaño entero: el nombre
+  // lo elige quien registra la app, y aquí se enseñaría tal cual. No se autoriza.
+  if (!deConfianza && /lifepuff|life\s*puff|\bpuff\b|oficial|official|soporte|support|seguridad|security|verificaci/i.test(cliente.nombre)) {
+    pinta(`
+      <h1>Esto no es LifePuff</h1>
+      <p class="ayuda">Una aplicación que se registró sola está pidiendo entrar con el nombre «${esc(cliente.nombre)}», como si fuera LifePuff o su soporte. LifePuff nunca te pediría esto.</p>
+      <p class="nota">Si alguien te mandó este enlace diciendo que era necesario para arreglar algo de tu cuenta, no lo era. No hace falta que hagas nada más: cierra esta ventana.${
+        detalles?.redirect_uri ? '<br><br>Quería devolverte a <b>' + esc(detalles.redirect_uri) + '</b>' : ''}</p>
+      <button id="no" class="boton">Cancelar y salir</button>
+    `);
+    document.getElementById('no').onclick = () => decide(false);
+    return;
+  }
+
   const permisosOauth = String(detalles?.scope ?? '').split(/\s+/).filter(Boolean);
 
+  // A un desconocido no se le marca nada de antemano: pulsar «Permitir» sin
+  // leer no debe conceder ni una sola cosa.
   const casilla = (clave, texto, marcada) => `
     <label class="casilla">
-      <input type="checkbox" value="${esc(clave)}"${marcada ? ' checked' : ''}>
+      <input type="checkbox" value="${esc(clave)}"${marcada && deConfianza ? ' checked' : ''}>
       <span>${esc(texto)}</span>
     </label>`;
 
+  const edad = ficha?.minutos_de_vida;
+  const cuando = edad == null ? '' :
+    edad < 60 ? `hace ${edad} minuto${edad === 1 ? '' : 's'}` :
+    edad < 1440 ? `hace ${Math.floor(edad / 60)} hora${Math.floor(edad / 60) === 1 ? '' : 's'}` :
+    `hace ${Math.floor(edad / 1440)} día${Math.floor(edad / 1440) === 1 ? '' : 's'}`;
+
+  const cartel = deConfianza
+    ? ''
+    : `<p class="alerta"><b>No conocemos esta aplicación.</b> Se registró sola${cuando ? ', ' + cuando : ''}, y nadie la ha revisado. Cualquiera puede registrar una con el nombre que quiera. Si no fuiste tú quien la está conectando ahora mismo, pulsa «Ahora no».</p>`;
+
   pinta(`
     <h1>${esc(cliente.nombre)} quiere entrar en tu LifePuff</h1>
-    <p class="ayuda">Como ${esc(usuario?.email ?? 'tú')}. Si no reconoces ese nombre, pulsa «Ahora no».</p>
+    <p class="ayuda">Como ${esc(usuario?.email ?? 'tú')}.</p>
+
+    ${cartel}
 
     <div class="lista">
       ${(permisosOauth.length ? permisosOauth : ['email']).map((p) =>
