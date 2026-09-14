@@ -18,7 +18,7 @@
 //
 // Aquí no hay nada secreto: la clave es la publicable, la misma que ya lleva la
 // app en el teléfono. Quien decide es Supabase Auth, con la sesión de quien
-// esté mirando; esta página solo pregunta y enseña lo que se va a conceder.
+// esté mirando; esta página pregunta, enseña lo que se concede y lo guarda.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 const SUPABASE_URL = 'https://ozaeottpolihdynydnht.supabase.co';
@@ -32,8 +32,32 @@ const idAutorizacion = new URLSearchParams(location.search).get('authorization_i
 const ESTA_PAGINA = location.origin + location.pathname +
   '?authorization_id=' + encodeURIComponent(idAutorizacion ?? '');
 
+/**
+ * Lo que puede tocar de LifePuff. Los permisos de OAuth de arriba solo dicen
+ * quién eres; estos dicen qué ve y qué crea, que es lo que de verdad importa.
+ * Los de ver vienen marcados; los de crear, no: que los encienda quien quiera.
+ */
+const PERMISOS_VER = [
+  ['spaces:read', 'Tus espacios y quién está en cada uno'],
+  ['tasks:read', 'Tus tareas'],
+  ['calendar:read', 'Tu calendario'],
+  ['schedule:read', 'Tu horario de trabajo'],
+  ['money:read', 'Tus gastos y presupuestos'],
+  ['trips:read', 'Tus viajes'],
+  ['home:read', 'Tu hogar: garantías y mantenimiento'],
+  ['pets:read', 'Tus mascotas'],
+  ['vault:metadata:read', 'Los datos de la Bóveda (nunca los archivos)'],
+];
+
+const PERMISOS_CREAR = [
+  ['tasks:write', 'Crear y completar tareas'],
+  ['calendar:write', 'Crear eventos'],
+  ['money:write', 'Anotar gastos'],
+  ['trips:write', 'Añadir cosas a un viaje'],
+];
+
 /** Los permisos de OAuth, dichos como se los dirías a una persona. */
-const NOMBRES = {
+const NOMBRES_OAUTH = {
   openid: 'Saber que eres tú',
   email: 'Ver tu correo',
   profile: 'Ver tu nombre y tu foto',
@@ -95,6 +119,9 @@ function pideEntrar(error) {
 }
 
 // ----------------------------------------------------------- dar o negar permiso
+let cliente = null;   // { id, nombre, crudo }
+let usuario = null;
+
 async function pideConsentimiento() {
   pinta('<p class="ayuda">Un momento…</p>');
 
@@ -113,22 +140,46 @@ async function pideConsentimiento() {
     return location.replace(detalles.redirect_url);
   }
 
-  const quien = detalles?.client?.name || 'Un asistente';
-  const permisos = String(detalles?.scope ?? '').split(/\s+/).filter(Boolean);
-  const { data: { user } } = await supabase.auth.getUser();
+  const c = detalles?.client ?? {};
+  cliente = {
+    id: c.client_id ?? c.id ?? detalles?.client_id ?? null,
+    nombre: c.client_name ?? c.name ?? 'Un asistente',
+    crudo: c,
+  };
+  ({ data: { user: usuario } } = await supabase.auth.getUser());
+
+  const permisosOauth = String(detalles?.scope ?? '').split(/\s+/).filter(Boolean);
+
+  const casilla = (clave, texto, marcada) => `
+    <label class="casilla">
+      <input type="checkbox" value="${esc(clave)}"${marcada ? ' checked' : ''}>
+      <span>${esc(texto)}</span>
+    </label>`;
 
   pinta(`
-    <h1>${esc(quien)} quiere entrar en tu LifePuff</h1>
-    <p class="ayuda">Como ${esc(user?.email ?? 'tú')}. Si no reconoces ese nombre, pulsa «Ahora no».</p>
+    <h1>${esc(cliente.nombre)} quiere entrar en tu LifePuff</h1>
+    <p class="ayuda">Como ${esc(usuario?.email ?? 'tú')}. Si no reconoces ese nombre, pulsa «Ahora no».</p>
+
     <div class="lista">
-      ${(permisos.length ? permisos : ['email']).map((p) =>
-        '<div class="fila"><span class="tic">✓</span>' + esc(NOMBRES[p] ?? p) + '</div>').join('')}
-      <div class="fila"><span class="tic">✓</span>Entrar en tus espacios de LifePuff con tus mismos permisos</div>
+      ${(permisosOauth.length ? permisosOauth : ['email']).map((p) =>
+        '<div class="fila"><span class="tic">✓</span>' + esc(NOMBRES_OAUTH[p] ?? p) + '</div>').join('')}
     </div>
-    <p class="nota">Verá lo mismo que tú y nada más. De la Bóveda recibe los datos, nunca los archivos. Puedes quitarle el acceso cuando quieras desde Ajustes.${
+
+    <div class="grupo">
+      <div class="grupo-titulo">Qué podrá ver</div>
+      ${PERMISOS_VER.map(([k, t]) => casilla(k, t, true)).join('')}
+    </div>
+
+    <div class="grupo">
+      <div class="grupo-titulo">Qué podrá crear</div>
+      ${PERMISOS_CREAR.map(([k, t]) => casilla(k, t, false)).join('')}
+    </div>
+
+    <p class="nota">Aun con todo marcado, verá lo mismo que tú y nada más: tus espacios, con tus mismos permisos. De la Bóveda recibe los datos, nunca los archivos. Puedes cambiar esto o quitarle el acceso cuando quieras, desde Ajustes en la app.${
       detalles?.redirect_uri
         ? '<br><br>Al terminar te devolverá a <b>' + esc(detalles.redirect_uri) + '</b>'
         : ''}</p>
+
     <button id="si" class="boton">Permitir</button>
     <button id="no" class="boton secundario">Ahora no</button>
   `);
@@ -137,14 +188,39 @@ async function pideConsentimiento() {
   document.getElementById('no').onclick = () => decide(false);
 }
 
+/** Lo que quedó marcado cuando se pulsó Permitir. */
+function elegidos() {
+  return [...pantalla.querySelectorAll('input[type=checkbox]:checked')].map((i) => i.value);
+}
+
 async function decide(permitir) {
+  const scopes = permitir ? elegidos() : [];
   pinta('<p class="ayuda">' + (permitir ? 'Conectando…' : 'Cancelando…') + '</p>');
+
   try {
+    // Primero se guarda lo que puede hacer; si esto falla no se autoriza, para
+    // no dejar un asistente conectado sin saber qué le dejaste tocar.
+    if (permitir) {
+      if (!cliente?.id) {
+        return pinta('<h1>No se pudo completar</h1>' +
+          aviso('No se pudo identificar al asistente que lo pide. Vuelve a intentarlo desde él.'));
+      }
+      const { error } = await supabase.from('mcp_grants').upsert({
+        user_id: usuario.id,
+        client_id: String(cliente.id),
+        client_name: cliente.nombre,
+        client_raw: cliente.crudo,
+        scopes,
+      }, { onConflict: 'user_id,client_id' });
+      if (error) throw error;
+    }
+
     const { data, error } = permitir
       ? await supabase.auth.oauth.approveAuthorization(idAutorizacion)
       : await supabase.auth.oauth.denyAuthorization(idAutorizacion);
     if (error) throw error;
     if (data?.redirect_url) return location.replace(data.redirect_url);
+
     pinta('<h1>' + (permitir ? 'Listo' : 'Cancelado') +
       '</h1><p class="ayuda">Ya puedes volver a tu asistente y cerrar esta ventana.</p>');
   } catch (e) {
@@ -162,6 +238,9 @@ function traduce(mensaje) {
   if (m.includes('expired')) return 'La solicitud caducó. Vuelve a empezar desde tu asistente.';
   if (m.includes('not found')) return 'Esta solicitud ya no existe. Vuelve a empezar desde tu asistente.';
   if (m.includes('rate limit') || m.includes('too many')) return 'Demasiados intentos seguidos. Espera un minuto.';
+  if (m.includes('row-level security') || m.includes('permission denied')) {
+    return 'No se pudieron guardar los permisos. Vuelve a entrar y prueba otra vez.';
+  }
   return mensaje;
 }
 </script>

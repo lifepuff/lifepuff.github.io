@@ -51,3 +51,9 @@ input:focus { outline: 2px solid #4E7659; outline-offset: 1px; }
 .lista { margin: 0 0 16px; }
 .fila { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; padding: 7px 0; }
 .tic { color: #31543C; font-weight: 900; }
+
+/* Los permisos de LifePuff, en la pantalla de consentimiento. */
+.grupo { margin: 0 0 14px; }
+.grupo-titulo { font-size: 12px; font-weight: 800; letter-spacing: .3px; color: #4E7659; margin: 0 0 6px; }
+.casilla { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 7px 0; font-weight: 400; font-size: 14px; line-height: 1.45; cursor: pointer; }
+.casilla input { width: 19px; height: 19px; margin: 1px 0 0; flex: 0 0 auto; accent-color: #31543C; }
