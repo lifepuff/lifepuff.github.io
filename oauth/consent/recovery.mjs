@@ -18,8 +18,8 @@ export class Recovery {
   return data.user;
  }
  async grants() {
-  if(typeof this.api.auth.oauth?.getUserGrants!=='function') throw Error('Esta versión no permite recuperar permisos de forma segura.');
-  const {data,error}=await this.api.auth.oauth.getUserGrants();
+  if(typeof this.api.auth.oauth?.listGrants!=='function') throw Error('Esta versión no permite recuperar permisos de forma segura.');
+  const {data,error}=await this.api.auth.oauth.listGrants();
   if(error||!Array.isArray(data)) throw Error('No se pudieron validar las conexiones OAuth.');
   return data.filter(g=>typeof g?.client?.id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(g.client.id));
  }
