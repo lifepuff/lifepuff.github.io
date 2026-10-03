@@ -137,7 +137,9 @@ async function pideConsentimiento() {
 
   // Si ya le diste permiso antes, no se vuelve a preguntar: se sigue de largo.
   if (detalles && !('authorization_id' in detalles) && detalles.redirect_url) {
-    return location.replace(detalles.redirect_url);
+    pinta('<h1>Comprueba los permisos de LifePuff</h1><p class="ayuda">OAuth ya está autorizado. Eso no confirma que este asistente tenga permisos de LifePuff. Puedes revisar tus conexiones autorizadas y elegir personalmente los permisos que falten.</p><a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a><button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button><p class="nota">No se concederá acceso automáticamente. La revisión se abre en otra pestaña. Después puedes volver aquí y pulsar Continuar con el asistente; si tardas demasiado, inicia una solicitud nueva desde el asistente.</p>');
+    document.getElementById('continuar-oauth').onclick = () => location.replace(detalles.redirect_url);
+    return;
   }
 
   const c = detalles?.client ?? {};
