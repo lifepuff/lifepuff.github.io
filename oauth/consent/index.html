@@ -56,6 +56,15 @@ const PERMISOS_CREAR = [
   ['trips:write', 'Añadir cosas a un viaje'],
 ];
 
+// PopView usa el mismo servidor de permisos. Lo marcado aquí se guarda en
+// palomitas_ai_grants; sin nada marcado, el asistente no entra en PopView.
+const PERMISOS_POPVIEW = [
+  ['palomitas:read', 'PopView: ver tus títulos, listas y espacios'],
+  ['palomitas:write', 'PopView: añadir y cambiar títulos'],
+  ['palomitas:photos', 'PopView: poner portadas'],
+  ['palomitas:delete', 'PopView: borrar títulos'],
+];
+
 /** Los permisos de OAuth, dichos como se los dirías a una persona. */
 const NOMBRES_OAUTH = {
   openid: 'Saber que eres tú',
@@ -216,6 +225,11 @@ async function pideConsentimiento() {
       ${PERMISOS_CREAR.map(([k, t]) => casilla(k, t, false)).join('')}
     </div>
 
+    <div class="grupo">
+      <div class="grupo-titulo">PopView</div>
+      ${PERMISOS_POPVIEW.map(([k, t]) => casilla(k, t, k === 'palomitas:read')).join('')}
+    </div>
+
     <p class="nota">Aun con todo marcado, verá lo mismo que tú y nada más: tus espacios, con tus mismos permisos. De la Bóveda recibe los datos, nunca los archivos. Puedes cambiar esto o quitarle el acceso cuando quieras, desde Ajustes en la app.${
       detalles?.redirect_uri
         ? '<br><br>Al terminar te devolverá a <b>' + esc(detalles.redirect_uri) + '</b>'
@@ -246,14 +260,31 @@ async function decide(permitir) {
         return pinta('<h1>No se pudo completar</h1>' +
           aviso('No se pudo identificar al asistente que lo pide. Vuelve a intentarlo desde él.'));
       }
+      const deLifePuff = scopes.filter((s) => !s.startsWith('palomitas:'));
+      const dePopView = scopes.filter((s) => s.startsWith('palomitas:'));
       const { error } = await supabase.from('mcp_grants').upsert({
         user_id: usuario.id,
         client_id: String(cliente.id),
         client_name: cliente.nombre,
         client_raw: cliente.crudo,
-        scopes,
+        scopes: deLifePuff,
       }, { onConflict: 'user_id,client_id' });
       if (error) throw error;
+      if (dePopView.length) {
+        const r = await supabase.from('palomitas_ai_grants').upsert({
+          user_id: usuario.id,
+          client_id: String(cliente.id),
+          client_name: cliente.nombre,
+          scopes: dePopView,
+          token_hash: null,
+          token_hint: null,
+        }, { onConflict: 'user_id,client_id' });
+        if (r.error) throw r.error;
+      } else {
+        const r = await supabase.from('palomitas_ai_grants').delete()
+          .eq('user_id', usuario.id).eq('client_id', String(cliente.id)).is('token_hash', null);
+        if (r.error) throw r.error;
+      }
     }
 
     const { data, error } = permitir
