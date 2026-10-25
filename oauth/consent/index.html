@@ -8,10 +8,42 @@
 <link rel="stylesheet" href="../../estilo.css">
 </head>
 <body>
-<main class="caja">
+<main class="caja" aria-live="polite">
   <div class="marca">LifePuff</div>
   <div id="pantalla"><p class="ayuda">Cargando…</p></div>
+  <div id="respaldo" hidden>
+    <h1>La página no termina de cargar</h1>
+    <p class="ayuda">Puede ser un problema de conexión o del navegador que abrió tu asistente.</p>
+    <button id="reintentar" class="boton" type="button">Reintentar</button>
+    <p class="nota">Si sigue sin cargar, abre esta página en Chrome. <a id="abrir-chrome" href="#" target="_blank" rel="noopener noreferrer">Abrir en el navegador</a> · <a id="copiar-enlace" href="#">Copiar el enlace</a></p>
+    <p id="copiado" class="nota" hidden>Enlace copiado. Pégalo en Chrome.</p>
+  </div>
 </main>
+
+<script>
+// Fuera del módulo a propósito: si la librería no llega, esto sigue funcionando.
+(function () {
+  var respaldo = document.getElementById('respaldo');
+  var abrir = document.getElementById('abrir-chrome');
+  abrir.href = location.href;
+  window.__lpCargada = function () { clearTimeout(window.__lpTemporizador); };
+  window.__lpTemporizador = setTimeout(function () {
+    document.getElementById('pantalla').hidden = true;
+    respaldo.hidden = false;
+  }, 10000);
+  document.getElementById('reintentar').addEventListener('click', function () { location.reload(); });
+  document.getElementById('copiar-enlace').addEventListener('click', function (e) {
+    e.preventDefault();
+    var aviso = document.getElementById('copiado');
+    function hecho() { aviso.hidden = false; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(location.href).then(hecho, function () { window.prompt('Copia este enlace:', location.href); });
+    } else {
+      window.prompt('Copia este enlace:', location.href);
+    }
+  });
+})();
+</script>
 
 <script type="module">
 // La pantalla donde decides si tu asistente de IA puede entrar en tu LifePuff.
@@ -19,7 +51,7 @@
 // Aquí no hay nada secreto: la clave es la publicable, la misma que ya lleva la
 // app en el teléfono. Quien decide es Supabase Auth, con la sesión de quien
 // esté mirando; esta página pregunta, enseña lo que se concede y lo guarda.
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/+esm';
 
 const SUPABASE_URL = 'https://ozaeottpolihdynydnht.supabase.co';
 const CLAVE_PUBLICA = 'sb_publishable_imeQhxtGq-DF6vbhQ31jBw_VlfbK0j8';
@@ -27,6 +59,20 @@ const CLAVE_PUBLICA = 'sb_publishable_imeQhxtGq-DF6vbhQ31jBw_VlfbK0j8';
 const supabase = createClient(SUPABASE_URL, CLAVE_PUBLICA);
 const pantalla = document.getElementById('pantalla');
 const idAutorizacion = new URLSearchParams(location.search).get('authorization_id');
+const ID_VALIDO = /^[A-Za-z0-9_-]{8,128}$/;
+const ERROR_GENERICO = 'Algo salió mal. Vuelve a intentarlo desde tu asistente.';
+
+// Ya cargó el módulo: la propia página se encarga de los errores a partir de aquí.
+window.__lpCargada?.();
+
+/** Si algo tarda más de la cuenta, se corta con un error en vez de esperar para siempre. */
+function conLimite(promesa, ms = 15000) {
+  let t;
+  return Promise.race([
+    promesa,
+    new Promise((_, rechaza) => { t = setTimeout(() => rechaza(new Error('timeout')), ms); }),
+  ]).finally(() => clearTimeout(t));
+}
 
 // Al volver de Google hay que caer en esta misma página, con el mismo id.
 const ESTA_PAGINA = location.origin + location.pathname +
@@ -79,7 +125,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) =>
 const pinta = (html) => { pantalla.innerHTML = html; };
 const aviso = (texto) => '<p class="error">' + esc(texto) + '</p>';
 
-if (!idAutorizacion) {
+if (!idAutorizacion || !ID_VALIDO.test(idAutorizacion)) {
   pinta('<h1>Falta información</h1><p class="ayuda">Este enlace debe abrirse desde tu asistente. Inténtalo de nuevo desde allí.</p>');
 } else if (!supabase.auth.oauth) {
   pinta('<h1>No disponible</h1><p class="ayuda">Esta versión de LifePuff todavía no puede mostrar la pantalla de permisos. Inténtalo más tarde.</p>');
@@ -88,9 +134,15 @@ if (!idAutorizacion) {
 }
 
 async function arranca() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) return pideConsentimiento();
-  pideEntrar();
+  try {
+    const { data } = await conLimite(supabase.auth.getSession());
+    if (data?.session) return await pideConsentimiento();
+    pideEntrar();
+  } catch (e) {
+    pinta('<h1>No se pudo cargar</h1>' + aviso(traduce(e?.message)) +
+      '<button id="reintentar-2" class="boton">Reintentar</button>');
+    document.getElementById('reintentar-2').addEventListener('click', () => location.reload());
+  }
 }
 
 // ---------------------------------------------------------------------- entrar
@@ -106,16 +158,16 @@ function pideEntrar(error) {
     <button id="entrar" class="boton secundario">Entrar</button>
   `);
 
-  document.getElementById('google').onclick = async (e) => {
+  document.getElementById('google').addEventListener('click', async (e) => {
     e.currentTarget.disabled = true;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: ESTA_PAGINA },
     });
     if (error) pideEntrar(traduce(error.message));
-  };
+  });
 
-  document.getElementById('entrar').onclick = async (e) => {
+  document.getElementById('entrar').addEventListener('click', async (e) => {
     const boton = e.currentTarget;
     boton.disabled = true;
     boton.textContent = 'Entrando…';
@@ -124,7 +176,7 @@ function pideEntrar(error) {
     const { error } = await supabase.auth.signInWithPassword({ email: correo, password: clave });
     if (error) return pideEntrar(traduce(error.message));
     pideConsentimiento();
-  };
+  });
 }
 
 // ----------------------------------------------------------- dar o negar permiso
@@ -136,18 +188,18 @@ async function pideConsentimiento() {
 
   let detalles;
   try {
-    const { data, error } = await supabase.auth.oauth.getAuthorizationDetails(idAutorizacion);
+    const { data, error } = await conLimite(supabase.auth.oauth.getAuthorizationDetails(idAutorizacion));
     if (error) throw error;
     detalles = data;
   } catch (e) {
     return pinta('<h1>No se pudo cargar</h1>' +
-      aviso(traduce(e?.message) || 'Vuelve a intentarlo desde tu asistente.'));
+      aviso(traduce(e?.message)));
   }
 
   // Si ya le diste permiso antes, no se vuelve a preguntar: se sigue de largo.
   if (detalles && !('authorization_id' in detalles) && detalles.redirect_url) {
     pinta('<h1>Comprueba los permisos de LifePuff</h1><p class="ayuda">Este asistente ya está conectado, pero no tiene todos los permisos. Revísalos y selecciona los que quieras conceder.</p><a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a><button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button><p class="nota">La revisión se abrirá en otra pestaña. Al terminar, vuelve aquí y selecciona «Continuar con el asistente».</p>');
-    document.getElementById('continuar-oauth').onclick = () => location.replace(detalles.redirect_url);
+    document.getElementById('continuar-oauth').addEventListener('click', () => location.replace(detalles.redirect_url));
     return;
   }
 
@@ -157,14 +209,21 @@ async function pideConsentimiento() {
     nombre: c.client_name ?? c.name ?? 'Un asistente',
     crudo: c,
   };
-  ({ data: { user: usuario } } = await supabase.auth.getUser());
+  try {
+    const { data, error } = await conLimite(supabase.auth.getUser());
+    if (error) throw error;
+    usuario = data?.user ?? null;
+  } catch (e) {
+    return pinta('<h1>No se pudo cargar</h1>' + aviso(traduce(e?.message)));
+  }
+  if (!usuario) return pideEntrar('Tu sesión caducó. Inicia sesión de nuevo.');
 
   // De dónde salió esta app: la creó el dueño del proyecto, o se registró sola
   // por la puerta pública. Es la diferencia entre un conocido y un desconocido,
   // y cambia todo lo que viene debajo.
   let ficha = null;
   try {
-    const { data } = await supabase.rpc('oauth_cliente_info', { p_client_id: cliente.id });
+    const { data } = await conLimite(supabase.rpc('oauth_cliente_info', { p_client_id: cliente.id }));
     ficha = Array.isArray(data) ? data[0] : data;
   } catch { /* si no se puede saber, se trata como desconocida */ }
 
@@ -180,7 +239,7 @@ async function pideConsentimiento() {
         detalles?.redirect_uri ? '<br><br>Intentaba redirigirte a <b>' + esc(detalles.redirect_uri) + '</b>' : ''}</p>
       <button id="no" class="boton">Cancelar y salir</button>
     `);
-    document.getElementById('no').onclick = () => decide(false);
+    document.getElementById('no').addEventListener('click', () => decide(false));
     return;
   }
 
@@ -207,6 +266,8 @@ async function pideConsentimiento() {
   pinta(`
     <h1>${esc(cliente.nombre)} quiere entrar en tu LifePuff</h1>
     <p class="ayuda">Como ${esc(usuario?.email ?? 'tú')}.</p>
+    <p class="nota">Identificador del asistente: <b>${esc(String(cliente.id ?? 'desconocido').slice(0, 8))}…</b>${
+      detalles?.redirect_uri ? '<br>Dirección de vuelta: <b>' + esc(detalles.redirect_uri) + '</b>' : ''}</p>
 
     ${cartel}
 
@@ -239,8 +300,8 @@ async function pideConsentimiento() {
     <button id="no" class="boton secundario">Ahora no</button>
   `);
 
-  document.getElementById('si').onclick = () => decide(true);
-  document.getElementById('no').onclick = () => decide(false);
+  document.getElementById('si').addEventListener('click', () => decide(true));
+  document.getElementById('no').addEventListener('click', () => decide(false));
 }
 
 /** Lo que quedó marcado cuando se pulsó Permitir. */
@@ -248,63 +309,95 @@ function elegidos() {
   return [...pantalla.querySelectorAll('input[type=checkbox]:checked')].map((i) => i.value);
 }
 
+let decidiendo = false;
+
 async function decide(permitir) {
+  // Un solo clic: los dos botones se bloquean en cuanto se pulsa uno.
+  if (decidiendo) return;
+  decidiendo = true;
+  pantalla.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+
   const scopes = permitir ? elegidos() : [];
+
+  if (permitir && (!cliente?.id || !usuario?.id)) {
+    return pinta('<h1>No se pudo completar</h1>' +
+      aviso('No se pudo identificar al asistente que realiza la solicitud. Inténtalo de nuevo desde el asistente.'));
+  }
+
   pinta('<p class="ayuda">' + (permitir ? 'Conectando…' : 'Cancelando…') + '</p>');
 
+  // 1) Primero se autoriza (o se niega). Si esto falla, no se guarda nada: así
+  //    nunca queda un permiso apuntado para una conexión que no se concedió.
+  let destino = null;
   try {
-    // Primero se guarda lo que puede hacer; si esto falla no se autoriza, para
-    // no dejar un asistente conectado sin saber qué le dejaste tocar.
-    if (permitir) {
-      if (!cliente?.id) {
-        return pinta('<h1>No se pudo completar</h1>' +
-          aviso('No se pudo identificar al asistente que realiza la solicitud. Inténtalo de nuevo desde el asistente.'));
-      }
-      const deLifePuff = scopes.filter((s) => !s.startsWith('palomitas:'));
-      const dePopView = scopes.filter((s) => s.startsWith('palomitas:'));
-      const { error } = await supabase.from('mcp_grants').upsert({
-        user_id: usuario.id,
-        client_id: String(cliente.id),
-        client_name: cliente.nombre,
-        client_raw: cliente.crudo,
-        scopes: deLifePuff,
-      }, { onConflict: 'user_id,client_id' });
-      if (error) throw error;
-      if (dePopView.length) {
-        const r = await supabase.from('palomitas_ai_grants').upsert({
-          user_id: usuario.id,
-          client_id: String(cliente.id),
-          client_name: cliente.nombre,
-          scopes: dePopView,
-          token_hash: null,
-          token_hint: null,
-        }, { onConflict: 'user_id,client_id' });
-        if (r.error) throw r.error;
-      } else {
-        const r = await supabase.from('palomitas_ai_grants').delete()
-          .eq('user_id', usuario.id).eq('client_id', String(cliente.id)).is('token_hash', null);
-        if (r.error) throw r.error;
-      }
-    }
-
-    const { data, error } = permitir
-      ? await supabase.auth.oauth.approveAuthorization(idAutorizacion)
-      : await supabase.auth.oauth.denyAuthorization(idAutorizacion);
+    const { data, error } = await conLimite(permitir
+      ? supabase.auth.oauth.approveAuthorization(idAutorizacion)
+      : supabase.auth.oauth.denyAuthorization(idAutorizacion));
     if (error) throw error;
-    if (data?.redirect_url) return location.replace(data.redirect_url);
-
-    pinta('<h1>' + (permitir ? 'Listo' : 'Cancelado') +
-      '</h1><p class="ayuda">Ya puedes volver a tu asistente y cerrar esta ventana.</p>');
+    destino = data?.redirect_url ?? null;
   } catch (e) {
-    pinta('<h1>No se pudo completar</h1>' +
-      aviso(traduce(e?.message) || 'Inténtalo de nuevo desde tu asistente.'));
+    return pinta('<h1>No se pudo completar</h1>' + aviso(traduce(e?.message)));
+  }
+
+  // 2) Solo si se autorizó, se guarda qué puede tocar. Si esto falla, el
+  //    asistente queda conectado pero sin permisos nuevos (el servidor no le deja
+  //    hacer nada que no esté guardado), y se avisa en vez de seguir en silencio.
+  if (permitir) {
+    try {
+      await guardaPermisos(scopes);
+    } catch (e) {
+      pinta('<h1>Conectado, pero sin permisos</h1>' +
+        aviso('Se autorizó al asistente, pero no se pudieron guardar sus permisos, así que todavía no podrá ver ni crear nada.') +
+        '<p class="ayuda">Revisa los permisos y vuelve a guardarlos.</p>' +
+        '<a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a>' +
+        (destino ? '<button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button>' : ''));
+      document.getElementById('continuar-oauth')?.addEventListener('click', () => location.replace(destino));
+      return;
+    }
+  }
+
+  if (destino) return location.replace(destino);
+
+  pinta('<h1>' + (permitir ? 'Listo' : 'Cancelado') +
+    '</h1><p class="ayuda">Ya puedes volver a tu asistente y cerrar esta ventana.</p>');
+}
+
+/** Guarda en LifePuff y PopView lo que quedó marcado. Lanza si algo falla. */
+async function guardaPermisos(scopes) {
+  const deLifePuff = scopes.filter((s) => !s.startsWith('palomitas:'));
+  const dePopView = scopes.filter((s) => s.startsWith('palomitas:'));
+  const { error } = await conLimite(supabase.from('mcp_grants').upsert({
+    user_id: usuario.id,
+    client_id: String(cliente.id),
+    client_name: cliente.nombre,
+    client_raw: cliente.crudo,
+    scopes: deLifePuff,
+  }, { onConflict: 'user_id,client_id' }));
+  if (error) throw error;
+  if (dePopView.length) {
+    const r = await conLimite(supabase.from('palomitas_ai_grants').upsert({
+      user_id: usuario.id,
+      client_id: String(cliente.id),
+      client_name: cliente.nombre,
+      scopes: dePopView,
+      token_hash: null,
+      token_hint: null,
+    }, { onConflict: 'user_id,client_id' }));
+    if (r.error) throw r.error;
+  } else {
+    const r = await conLimite(supabase.from('palomitas_ai_grants').delete()
+      .eq('user_id', usuario.id).eq('client_id', String(cliente.id)).is('token_hash', null));
+    if (r.error) throw r.error;
   }
 }
 
 /** Los mensajes de Supabase vienen en inglés y de técnico. Aquí se traducen. */
 function traduce(mensaje) {
   const m = String(mensaje ?? '').toLowerCase();
-  if (!m) return '';
+  if (!m) return ERROR_GENERICO;
+  if (m === 'timeout' || m.includes('failed to fetch') || m.includes('network')) {
+    return 'No hay conexión o el servidor tarda demasiado. Revisa tu conexión y vuelve a intentarlo.';
+  }
   if (m.includes('invalid login')) return 'Ese correo o esa contraseña no son correctos.';
   if (m.includes('email not confirmed')) return 'Todavía no has confirmado tu correo. Revisa tu bandeja de entrada.';
   if (m.includes('expired')) return 'La solicitud caducó. Vuelve a empezar desde tu asistente.';
@@ -313,7 +406,7 @@ function traduce(mensaje) {
   if (m.includes('row-level security') || m.includes('permission denied')) {
     return 'No se pudieron guardar los permisos. Inicia sesión de nuevo e inténtalo otra vez.';
   }
-  return mensaje;
+  return ERROR_GENERICO;
 }
 </script>
 </body>
