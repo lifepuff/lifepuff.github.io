@@ -11,7 +11,7 @@
 <main class="caja">
   <div class="marca">LifePuff</div>
   <h1 id="titulo">Abriendo la app…</h1>
-  <p class="ayuda" id="ayuda">Si no se abre sola, toca el botón.</p>
+  <p class="ayuda" id="ayuda">Si no se abre automáticamente, selecciona el botón.</p>
   <a id="ir" class="boton" href="lifepuff://auth-callback">Abrir LifePuff</a>
 </main>
 
@@ -36,7 +36,7 @@
     // datos solo le daría un error, así que se le explica dónde está.
     document.getElementById('titulo').textContent = 'Esta página abre la app';
     document.getElementById('ayuda').textContent =
-      'Solo funciona desde los enlaces que LifePuff te manda por correo.';
+      'Esta página solo funciona con los enlaces que LifePuff envía por correo electrónico.';
   }
 })();
 </script>

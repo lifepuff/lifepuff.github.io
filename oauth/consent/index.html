@@ -53,7 +53,7 @@ const PERMISOS_CREAR = [
   ['tasks:write', 'Crear y completar tareas'],
   ['calendar:write', 'Crear eventos'],
   ['money:write', 'Anotar gastos'],
-  ['trips:write', 'Añadir cosas a un viaje'],
+  ['trips:write', 'Añadir elementos a un viaje'],
 ];
 
 // PopView usa el mismo servidor de permisos. Lo marcado aquí se guarda en
@@ -61,17 +61,17 @@ const PERMISOS_CREAR = [
 const PERMISOS_POPVIEW = [
   ['palomitas:read', 'PopView: ver tus títulos, listas y espacios'],
   ['palomitas:write', 'PopView: añadir y cambiar títulos'],
-  ['palomitas:photos', 'PopView: poner portadas'],
+  ['palomitas:photos', 'PopView: añadir portadas'],
   ['palomitas:delete', 'PopView: borrar títulos'],
 ];
 
 /** Los permisos de OAuth, dichos como se los dirías a una persona. */
 const NOMBRES_OAUTH = {
-  openid: 'Saber que eres tú',
+  openid: 'Verificar tu identidad',
   email: 'Ver tu correo',
   profile: 'Ver tu nombre y tu foto',
   phone: 'Ver tu teléfono',
-  offline_access: 'Seguir conectado sin volver a pedírtelo',
+  offline_access: 'Mantener la sesión iniciada',
 };
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) =>
@@ -80,7 +80,7 @@ const pinta = (html) => { pantalla.innerHTML = html; };
 const aviso = (texto) => '<p class="error">' + esc(texto) + '</p>';
 
 if (!idAutorizacion) {
-  pinta('<h1>Falta información</h1><p class="ayuda">Este enlace tiene que venir desde tu asistente. Vuelve a intentarlo desde ahí.</p>');
+  pinta('<h1>Falta información</h1><p class="ayuda">Este enlace debe abrirse desde tu asistente. Inténtalo de nuevo desde allí.</p>');
 } else if (!supabase.auth.oauth) {
   pinta('<h1>No disponible</h1><p class="ayuda">Esta versión de LifePuff todavía no puede mostrar la pantalla de permisos. Inténtalo más tarde.</p>');
 } else {
@@ -96,11 +96,11 @@ async function arranca() {
 // ---------------------------------------------------------------------- entrar
 function pideEntrar(error) {
   pinta(`
-    <h1>Entra en LifePuff</h1>
+    <h1>Inicia sesión en LifePuff</h1>
     <p class="ayuda">Primero confirma que eres tú.</p>
     ${error ? aviso(error) : ''}
     <button id="google" class="boton">Continuar con Google</button>
-    <div class="separador"><span>o con tu contraseña</span></div>
+    <div class="separador"><span>o inicia sesión con tu contraseña</span></div>
     <label>Correo<input id="correo" type="email" autocomplete="email" placeholder="tu@correo.com"></label>
     <label>Contraseña<input id="clave" type="password" autocomplete="current-password" placeholder="Tu contraseña"></label>
     <button id="entrar" class="boton secundario">Entrar</button>
@@ -132,7 +132,7 @@ let cliente = null;   // { id, nombre, crudo }
 let usuario = null;
 
 async function pideConsentimiento() {
-  pinta('<p class="ayuda">Un momento…</p>');
+  pinta('<p class="ayuda">Cargando…</p>');
 
   let detalles;
   try {
@@ -146,7 +146,7 @@ async function pideConsentimiento() {
 
   // Si ya le diste permiso antes, no se vuelve a preguntar: se sigue de largo.
   if (detalles && !('authorization_id' in detalles) && detalles.redirect_url) {
-    pinta('<h1>Comprueba los permisos de LifePuff</h1><p class="ayuda">Este asistente ya está conectado, pero le faltan permisos. Revísalos y elige cuáles darle.</p><a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a><button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button><p class="nota">Se abre en otra pestaña. Cuando termines, vuelve y toca «Continuar con el asistente».</p>');
+    pinta('<h1>Comprueba los permisos de LifePuff</h1><p class="ayuda">Este asistente ya está conectado, pero no tiene todos los permisos. Revísalos y selecciona los que quieras conceder.</p><a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a><button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button><p class="nota">La revisión se abrirá en otra pestaña. Al terminar, vuelve aquí y selecciona «Continuar con el asistente».</p>');
     document.getElementById('continuar-oauth').onclick = () => location.replace(detalles.redirect_url);
     return;
   }
@@ -174,10 +174,10 @@ async function pideConsentimiento() {
   // lo elige quien registra la app, y aquí se enseñaría tal cual. No se autoriza.
   if (!deConfianza && /lifepuff|life\s*puff|\bpuff\b|oficial|official|soporte|support|seguridad|security|verificaci/i.test(cliente.nombre)) {
     pinta(`
-      <h1>Esto no es LifePuff</h1>
-      <p class="ayuda">«${esc(cliente.nombre)}» se hace pasar por LifePuff. LifePuff nunca te pediría esto.</p>
+      <h1>Aplicación no autorizada</h1>
+      <p class="ayuda">«${esc(cliente.nombre)}» intenta hacerse pasar por LifePuff. LifePuff nunca solicita este acceso.</p>
       <p class="nota">Cierra esta ventana; no tienes que hacer nada más.${
-        detalles?.redirect_uri ? '<br><br>Quería devolverte a <b>' + esc(detalles.redirect_uri) + '</b>' : ''}</p>
+        detalles?.redirect_uri ? '<br><br>Intentaba redirigirte a <b>' + esc(detalles.redirect_uri) + '</b>' : ''}</p>
       <button id="no" class="boton">Cancelar y salir</button>
     `);
     document.getElementById('no').onclick = () => decide(false);
@@ -202,7 +202,7 @@ async function pideConsentimiento() {
 
   const cartel = deConfianza
     ? ''
-    : `<p class="alerta"><b>No conocemos esta aplicación.</b> Se registró sola${cuando ? ', ' + cuando : ''}. Cualquiera puede ponerle este nombre. Si no la estás conectando tú ahora, toca «Ahora no».</p>`;
+    : `<p class="alerta"><b>Aplicación no verificada.</b> Se registró de forma automática${cuando ? ', ' + cuando : ''}. Cualquiera puede usar este nombre. Si no eres tú quien la está conectando, selecciona «Ahora no».</p>`;
 
   pinta(`
     <h1>${esc(cliente.nombre)} quiere entrar en tu LifePuff</h1>
@@ -230,9 +230,9 @@ async function pideConsentimiento() {
       ${PERMISOS_POPVIEW.map(([k, t]) => casilla(k, t, k === 'palomitas:read')).join('')}
     </div>
 
-    <p class="nota">Nunca verá más que tú. De la Bóveda solo ve los datos, no los archivos. Puedes cambiarlo o quitarle el acceso en Ajustes.${
+    <p class="nota">Nunca tendrá más acceso que tú. De la Bóveda solo verá los datos, no los archivos. Puedes cambiar o retirar este acceso en Ajustes.${
       detalles?.redirect_uri
-        ? '<br><br>Al terminar te devolverá a <b>' + esc(detalles.redirect_uri) + '</b>'
+        ? '<br><br>Al finalizar, se te redirigirá a <b>' + esc(detalles.redirect_uri) + '</b>'
         : ''}</p>
 
     <button id="si" class="boton">Permitir</button>
@@ -258,7 +258,7 @@ async function decide(permitir) {
     if (permitir) {
       if (!cliente?.id) {
         return pinta('<h1>No se pudo completar</h1>' +
-          aviso('No se pudo identificar al asistente que lo pide. Vuelve a intentarlo desde él.'));
+          aviso('No se pudo identificar al asistente que realiza la solicitud. Inténtalo de nuevo desde el asistente.'));
       }
       const deLifePuff = scopes.filter((s) => !s.startsWith('palomitas:'));
       const dePopView = scopes.filter((s) => s.startsWith('palomitas:'));
@@ -297,7 +297,7 @@ async function decide(permitir) {
       '</h1><p class="ayuda">Ya puedes volver a tu asistente y cerrar esta ventana.</p>');
   } catch (e) {
     pinta('<h1>No se pudo completar</h1>' +
-      aviso(traduce(e?.message) || 'Inténtalo otra vez desde tu asistente.'));
+      aviso(traduce(e?.message) || 'Inténtalo de nuevo desde tu asistente.'));
   }
 }
 
@@ -306,12 +306,12 @@ function traduce(mensaje) {
   const m = String(mensaje ?? '').toLowerCase();
   if (!m) return '';
   if (m.includes('invalid login')) return 'Ese correo o esa contraseña no son correctos.';
-  if (m.includes('email not confirmed')) return 'Todavía no has confirmado tu correo. Mira tu bandeja de entrada.';
+  if (m.includes('email not confirmed')) return 'Todavía no has confirmado tu correo. Revisa tu bandeja de entrada.';
   if (m.includes('expired')) return 'La solicitud caducó. Vuelve a empezar desde tu asistente.';
   if (m.includes('not found')) return 'Esta solicitud ya no existe. Vuelve a empezar desde tu asistente.';
-  if (m.includes('rate limit') || m.includes('too many')) return 'Demasiados intentos seguidos. Espera un minuto.';
+  if (m.includes('rate limit') || m.includes('too many')) return 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
   if (m.includes('row-level security') || m.includes('permission denied')) {
-    return 'No se pudieron guardar los permisos. Vuelve a entrar y prueba otra vez.';
+    return 'No se pudieron guardar los permisos. Inicia sesión de nuevo e inténtalo otra vez.';
   }
   return mensaje;
 }

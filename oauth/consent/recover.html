@@ -13,8 +13,8 @@ async function start(){
  paint('<p class="ayuda">Comprobando tu cuenta…</p>');
  const {data,error:err}=await supabase.auth.getUser();
  if(err||!data?.user){
-  paint('<h1>Entra en LifePuff</h1><p class="ayuda">Usa la cuenta cuyos permisos quieres revisar.</p><label>Correo<input id="email" type="email" autocomplete="email"></label><label>Contraseña<input id="password" type="password" autocomplete="current-password"></label><button class="boton" id="login">Entrar</button>');
-  document.getElementById('login').onclick=async e=>{e.target.disabled=true;const {error:err}=await supabase.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value});if(err)return error(Error('No se pudo entrar. Revisa tu correo y tu contraseña.'));await start();};return;
+  paint('<h1>Inicia sesión en LifePuff</h1><p class="ayuda">Usa la cuenta cuyos permisos quieres revisar.</p><label>Correo<input id="email" type="email" autocomplete="email"></label><label>Contraseña<input id="password" type="password" autocomplete="current-password"></label><button class="boton" id="login">Entrar</button>');
+  document.getElementById('login').onclick=async e=>{e.target.disabled=true;const {error:err}=await supabase.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value});if(err)return error(Error('No se pudo iniciar sesión. Revisa tu correo y tu contraseña.'));await start();};return;
  }
  try{
   const {user,clients}=await recovery.load();
@@ -23,14 +23,14 @@ async function start(){
   document.getElementById('cancel').onclick=cancel;
  }catch(e){error(e);}
 }
-function cancel(){recovery.cancel();paint('<h1>Cancelado</h1><p>No has concedido nuevos permisos.</p>');}
+function cancel(){recovery.cancel();paint('<h1>Cancelado</h1><p>No se han concedido nuevos permisos.</p>');}
 function show(client,user,displayedIdentity){
- paint('<h1>Elige qué puede hacer '+esc(client.name||'este asistente')+'</h1><p>Cuenta: '+esc(user.email)+'<br>Identificador: '+esc(client.id)+'</p><p class="nota">Activa solo los que necesites.</p>'+PERMISSIONS.map(([id,label])=>'<label class="casilla"><input type="checkbox" data-scope value="'+id+'"><span>'+esc(label)+'</span></label>').join('')+'<label class="casilla"><input type="checkbox" id="confirm"><span>Es mi cuenta y quiero dar estos permisos.</span></label><button class="boton" id="save">Confirmar permisos seleccionados</button><button class="boton secundario" id="cancel">Cancelar</button><p id="message" class="error"></p>');
+ paint('<h1>Elige qué puede hacer '+esc(client.name||'este asistente')+'</h1><p>Cuenta: '+esc(user.email)+'<br>Identificador: '+esc(client.id)+'</p><p class="nota">Activa solo los que necesites.</p>'+PERMISSIONS.map(([id,label])=>'<label class="casilla"><input type="checkbox" data-scope value="'+id+'"><span>'+esc(label)+'</span></label>').join('')+'<label class="casilla"><input type="checkbox" id="confirm"><span>Confirmo que es mi cuenta y concedo estos permisos.</span></label><button class="boton" id="save">Confirmar permisos seleccionados</button><button class="boton secundario" id="cancel">Cancelar</button><p id="message" class="error"></p>');
  document.getElementById('cancel').onclick=cancel;
  document.getElementById('save').onclick=async()=>{
   const message=document.getElementById('message');if(!document.getElementById('confirm').checked){message.textContent='Marca la casilla de confirmación.';return;}
   const scopes=[...screen.querySelectorAll('[data-scope]:checked')].map(x=>x.value);
-  if(!scopes.length){message.textContent='Selecciona al menos un permiso o toca Cancelar.';return;}
+  if(!scopes.length){message.textContent='Selecciona al menos un permiso o selecciona Cancelar.';return;}
   screen.querySelectorAll('button,input').forEach(x=>x.disabled=true);
   try{const result=await recovery.save(scopes,displayedIdentity);if(result.status==='existing')return management();paint('<h1>Permisos guardados</h1><p>Ya puedes volver a tu asistente.</p>');}catch(e){error(e);}
  };

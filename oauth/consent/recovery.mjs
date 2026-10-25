@@ -6,7 +6,7 @@ export const PERMISSIONS = [
  ['home:read','Tu hogar: garantías y mantenimiento'],['pets:read','Tus mascotas'],
  ['vault:metadata:read','Los datos de la Bóveda (nunca los archivos)'],
  ['tasks:write','Crear y completar tareas'],['calendar:write','Crear eventos'],
- ['money:write','Anotar gastos'],['trips:write','Añadir cosas a un viaje'],
+ ['money:write','Anotar gastos'],['trips:write','Añadir elementos a un viaje'],
 ];
 const allowed = new Set(PERMISSIONS.map(([id])=>id));
 export class Recovery {
