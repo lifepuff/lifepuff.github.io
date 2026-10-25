@@ -311,6 +311,35 @@ function elegidos() {
 
 let decidiendo = false;
 
+/**
+ * approveAuthorization y denyAuthorization devuelven OAuthRedirect.
+ * En auth-js 2.111.0 el campo es redirect_url, no redirect_to.
+ */
+function direccionDeVuelta(data) {
+  const url = data?.redirect_url;
+  return typeof url === 'string' && url ? url : null;
+}
+
+/** Solo una URL absoluta http o https se puede abrir. */
+function esHttp(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function errorGenerico() {
+  pinta('<h1>No se pudo completar</h1>' + aviso(ERROR_GENERICO));
+}
+
+/** Vuelve al asistente. Si la dirección falta o no es http(s), no navega. */
+function volverAlAsistente(url) {
+  if (!url || !esHttp(url)) return errorGenerico();
+  window.location.assign(url);
+}
+
 async function decide(permitir) {
   // Un solo clic: los dos botones se bloquean en cuanto se pulsa uno.
   if (decidiendo) return;
@@ -326,40 +355,44 @@ async function decide(permitir) {
 
   pinta('<p class="ayuda">' + (permitir ? 'Conectando…' : 'Cancelando…') + '</p>');
 
-  // 1) Primero se autoriza (o se niega). Si esto falla, no se guarda nada: así
-  //    nunca queda un permiso apuntado para una conexión que no se concedió.
+  // 1) Primero se autoriza (o se niega), sin dejar que la librería redirija sola.
+  //    Con el valor por defecto se iría al asistente antes de guardar los permisos.
+  //    Si esto falla, no se guarda nada.
   let destino = null;
   try {
     const { data, error } = await conLimite(permitir
-      ? supabase.auth.oauth.approveAuthorization(idAutorizacion)
-      : supabase.auth.oauth.denyAuthorization(idAutorizacion));
+      ? supabase.auth.oauth.approveAuthorization(idAutorizacion, { skipBrowserRedirect: true })
+      : supabase.auth.oauth.denyAuthorization(idAutorizacion, { skipBrowserRedirect: true }));
     if (error) throw error;
-    destino = data?.redirect_url ?? null;
+    destino = direccionDeVuelta(data);
   } catch (e) {
     return pinta('<h1>No se pudo completar</h1>' + aviso(traduce(e?.message)));
   }
 
-  // 2) Solo si se autorizó, se guarda qué puede tocar. Si esto falla, el
-  //    asistente queda conectado pero sin permisos nuevos (el servidor no le deja
-  //    hacer nada que no esté guardado), y se avisa en vez de seguir en silencio.
-  if (permitir) {
-    try {
-      await guardaPermisos(scopes);
-    } catch (e) {
-      pinta('<h1>Conectado, pero sin permisos</h1>' +
-        aviso('Se autorizó al asistente, pero no se pudieron guardar sus permisos, así que todavía no podrá ver ni crear nada.') +
-        '<p class="ayuda">Revisa los permisos y vuelve a guardarlos.</p>' +
-        '<a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a>' +
-        (destino ? '<button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button>' : ''));
-      document.getElementById('continuar-oauth')?.addEventListener('click', () => location.replace(destino));
-      return;
-    }
+  // Negar no guarda nada: se vuelve al asistente en cuanto hay una dirección válida.
+  if (!permitir) {
+    if (!destino) return errorGenerico();
+    return volverAlAsistente(destino);
   }
 
-  if (destino) return location.replace(destino);
+  // 2) Solo si se autorizó, se guarda qué puede tocar. La redirección espera a
+  //    que esto termine. Si falla, el asistente queda conectado pero sin permisos
+  //    nuevos y se avisa, sin irse de esta página.
+  try {
+    await guardaPermisos(scopes);
+  } catch {
+    if (!destino) return errorGenerico();
+    pinta('<h1>Conectado, pero sin permisos</h1>' +
+      aviso('Se autorizó al asistente, pero no se pudieron guardar sus permisos, así que todavía no podrá ver ni crear nada.') +
+      '<p class="ayuda">Revisa los permisos y vuelve a guardarlos.</p>' +
+      '<a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a>' +
+      '<button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button>');
+    document.getElementById('continuar-oauth').addEventListener('click', () => volverAlAsistente(destino));
+    return;
+  }
 
-  pinta('<h1>' + (permitir ? 'Listo' : 'Cancelado') +
-    '</h1><p class="ayuda">Ya puedes volver a tu asistente y cerrar esta ventana.</p>');
+  if (!destino) return errorGenerico();
+  volverAlAsistente(destino);
 }
 
 /** Guarda en LifePuff y PopView lo que quedó marcado. Lanza si algo falla. */
