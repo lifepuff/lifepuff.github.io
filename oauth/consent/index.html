@@ -97,7 +97,7 @@ async function arranca() {
 function pideEntrar(error) {
   pinta(`
     <h1>Entra en LifePuff</h1>
-    <p class="ayuda">Para decidir qué puede ver tu asistente, antes confirma que eres tú.</p>
+    <p class="ayuda">Primero confirma que eres tú.</p>
     ${error ? aviso(error) : ''}
     <button id="google" class="boton">Continuar con Google</button>
     <div class="separador"><span>o con tu contraseña</span></div>
@@ -146,7 +146,7 @@ async function pideConsentimiento() {
 
   // Si ya le diste permiso antes, no se vuelve a preguntar: se sigue de largo.
   if (detalles && !('authorization_id' in detalles) && detalles.redirect_url) {
-    pinta('<h1>Comprueba los permisos de LifePuff</h1><p class="ayuda">OAuth ya está autorizado. Eso no confirma que este asistente tenga permisos de LifePuff. Puedes revisar tus conexiones autorizadas y elegir personalmente los permisos que falten.</p><a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a><button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button><p class="nota">No se concederá acceso automáticamente. La revisión se abre en otra pestaña. Después puedes volver aquí y pulsar Continuar con el asistente; si tardas demasiado, inicia una solicitud nueva desde el asistente.</p>');
+    pinta('<h1>Comprueba los permisos de LifePuff</h1><p class="ayuda">Este asistente ya está conectado, pero le faltan permisos. Revísalos y elige cuáles darle.</p><a class="boton" href="/oauth/consent/recover.html" target="_blank" rel="noopener noreferrer">Revisar conexiones y permisos</a><button id="continuar-oauth" class="boton secundario">Continuar con el asistente</button><p class="nota">Se abre en otra pestaña. Cuando termines, vuelve y toca «Continuar con el asistente».</p>');
     document.getElementById('continuar-oauth').onclick = () => location.replace(detalles.redirect_url);
     return;
   }
@@ -175,8 +175,8 @@ async function pideConsentimiento() {
   if (!deConfianza && /lifepuff|life\s*puff|\bpuff\b|oficial|official|soporte|support|seguridad|security|verificaci/i.test(cliente.nombre)) {
     pinta(`
       <h1>Esto no es LifePuff</h1>
-      <p class="ayuda">Una aplicación que se registró sola está pidiendo entrar con el nombre «${esc(cliente.nombre)}», como si fuera LifePuff o su soporte. LifePuff nunca te pediría esto.</p>
-      <p class="nota">Si alguien te mandó este enlace diciendo que era necesario para arreglar algo de tu cuenta, no lo era. No hace falta que hagas nada más: cierra esta ventana.${
+      <p class="ayuda">«${esc(cliente.nombre)}» se hace pasar por LifePuff. LifePuff nunca te pediría esto.</p>
+      <p class="nota">Cierra esta ventana; no tienes que hacer nada más.${
         detalles?.redirect_uri ? '<br><br>Quería devolverte a <b>' + esc(detalles.redirect_uri) + '</b>' : ''}</p>
       <button id="no" class="boton">Cancelar y salir</button>
     `);
@@ -202,7 +202,7 @@ async function pideConsentimiento() {
 
   const cartel = deConfianza
     ? ''
-    : `<p class="alerta"><b>No conocemos esta aplicación.</b> Se registró sola${cuando ? ', ' + cuando : ''}, y nadie la ha revisado. Cualquiera puede registrar una con el nombre que quiera. Si no fuiste tú quien la está conectando ahora mismo, pulsa «Ahora no».</p>`;
+    : `<p class="alerta"><b>No conocemos esta aplicación.</b> Se registró sola${cuando ? ', ' + cuando : ''}. Cualquiera puede ponerle este nombre. Si no la estás conectando tú ahora, toca «Ahora no».</p>`;
 
   pinta(`
     <h1>${esc(cliente.nombre)} quiere entrar en tu LifePuff</h1>
@@ -230,7 +230,7 @@ async function pideConsentimiento() {
       ${PERMISOS_POPVIEW.map(([k, t]) => casilla(k, t, k === 'palomitas:read')).join('')}
     </div>
 
-    <p class="nota">Aun con todo marcado, verá lo mismo que tú y nada más: tus espacios, con tus mismos permisos. De la Bóveda recibe los datos, nunca los archivos. Puedes cambiar esto o quitarle el acceso cuando quieras, desde Ajustes en la app.${
+    <p class="nota">Nunca verá más que tú. De la Bóveda solo ve los datos, no los archivos. Puedes cambiarlo o quitarle el acceso en Ajustes.${
       detalles?.redirect_uri
         ? '<br><br>Al terminar te devolverá a <b>' + esc(detalles.redirect_uri) + '</b>'
         : ''}</p>

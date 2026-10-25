@@ -18,9 +18,9 @@ export class Recovery {
   return data.user;
  }
  async grants() {
-  if(typeof this.api.auth.oauth?.listGrants!=='function') throw Error('Esta versión no permite recuperar permisos de forma segura.');
+  if(typeof this.api.auth.oauth?.listGrants!=='function') throw Error('Esta página no está disponible ahora. Inténtalo más tarde.');
   const {data,error}=await this.api.auth.oauth.listGrants();
-  if(error||!Array.isArray(data)) throw Error('No se pudieron validar las conexiones OAuth.');
+  if(error||!Array.isArray(data)) throw Error('No se pudieron cargar tus asistentes conectados.');
   return data.filter(g=>typeof g?.client?.id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(g.client.id));
  }
  async load() {
@@ -47,7 +47,7 @@ export class Recovery {
  }
  async save(scopes,displayedIdentity) {
   if(this.busy)throw Error('Ya hay una confirmación en curso.');
-  if(!this.matches(displayedIdentity))throw Error('La conexión mostrada ya no coincide con la selección. Vuelve a elegirla.');
+  if(!this.matches(displayedIdentity))throw Error('La selección cambió. Vuelve a elegir el asistente.');
   if(!this.owner||!this.selected)throw Error('Selecciona una conexión validada.');
   if(!Array.isArray(scopes)||!scopes.length||scopes.some(s=>!allowed.has(s))||new Set(scopes).size!==scopes.length)throw Error('Selecciona al menos un permiso de la lista.');
   this.busy=true;const epoch=this.epoch,owner=this.owner.id,id=this.selected.id;
