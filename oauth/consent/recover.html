@@ -8,31 +8,31 @@ const recovery=new Recovery(supabase),screen=document.getElementById('pantalla')
 const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const paint=s=>screen.innerHTML=s;
 const error=e=>paint('<h1>No se pudo continuar</h1><p class="error">'+esc(e.message)+'</p><a href="/oauth/consent/recover.html">Volver a empezar</a>');
-const management=()=>paint('<h1>Esta conexión ya tiene permisos</h1><p class="ayuda">No hemos cambiado sus permisos. Revísalos en tu app LifePuff: Ajustes → Asistentes de IA.</p>');
+const management=()=>paint('<h1>Esta conexión ya tiene permisos</h1><p class="ayuda">Puedes revisarlos en la app: Ajustes → Asistentes de IA.</p>');
 async function start(){
  paint('<p class="ayuda">Comprobando tu cuenta…</p>');
  const {data,error:err}=await supabase.auth.getUser();
  if(err||!data?.user){
-  paint('<h1>Entra en LifePuff</h1><p class="ayuda">Usa la cuenta cuyos permisos quieres revisar.</p><label>Correo<input id="email" type="email" autocomplete="email"></label><label>Contraseña<input id="password" type="password" autocomplete="current-password"></label><button class="boton" id="login">Entrar</button>');
-  document.getElementById('login').onclick=async e=>{e.target.disabled=true;const {error:err}=await supabase.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value});if(err)return error(Error('No se pudo iniciar sesión. Comprueba tu cuenta y contraseña.'));await start();};return;
+  paint('<h1>Inicia sesión en LifePuff</h1><p class="ayuda">Usa la cuenta cuyos permisos quieres revisar.</p><label>Correo<input id="email" type="email" autocomplete="email"></label><label>Contraseña<input id="password" type="password" autocomplete="current-password"></label><button class="boton" id="login">Entrar</button>');
+  document.getElementById('login').onclick=async e=>{e.target.disabled=true;const {error:err}=await supabase.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value});if(err)return error(Error('No se pudo iniciar sesión. Revisa tu correo y tu contraseña.'));await start();};return;
  }
  try{
   const {user,clients}=await recovery.load();
-  paint('<h1>Revisa tus conexiones autorizadas</h1><p>Cuenta: <b>'+esc(user.email)+'</b></p><p class="nota">Si no es tu cuenta, cierra sesión en esta web antes de continuar. Los nombres de aplicaciones no certifican quién las creó. Comprueba también el identificador. Estos permisos alcanzan tus espacios según tus permisos actuales de cuenta; no se limitan a un espacio elegido.</p>'+(!clients.length?'<p>No hay conexiones OAuth autorizadas para esta cuenta.</p>':clients.map((g,i)=>'<button class="boton secundario" data-client="'+i+'">'+esc(g.client.name||'Un asistente')+' · '+esc(g.client.id)+'</button>').join(''))+'<button id="cancel" class="boton secundario">Cancelar</button>');
+  paint('<h1>Revisa tus conexiones autorizadas</h1><p>Cuenta: <b>'+esc(user.email)+'</b></p><p class="nota">Si no es tu cuenta, cierra sesión. Fíjate en el identificador, no solo en el nombre. Los permisos valen para todos tus espacios.</p>'+(!clients.length?'<p>Esta cuenta no tiene asistentes conectados.</p>':clients.map((g,i)=>'<button class="boton secundario" data-client="'+i+'">'+esc(g.client.name||'Un asistente')+' · '+esc(g.client.id)+'</button>').join(''))+'<button id="cancel" class="boton secundario">Cancelar</button>');
   screen.querySelectorAll('[data-client]').forEach(button=>button.onclick=async()=>{screen.querySelectorAll('[data-client]').forEach(x=>x.disabled=true);try{const result=await recovery.prepare(clients[Number(button.dataset.client)].client.id);if(!result)return;if(result.exists)return management();show(result.client,result.user,result.identity);}catch(e){error(e);}});
   document.getElementById('cancel').onclick=cancel;
  }catch(e){error(e);}
 }
-function cancel(){recovery.cancel();paint('<h1>Cancelado</h1><p>No has concedido nuevos permisos.</p>');}
+function cancel(){recovery.cancel();paint('<h1>Cancelado</h1><p>No se han concedido nuevos permisos.</p>');}
 function show(client,user,displayedIdentity){
- paint('<h1>Elige qué puede hacer '+esc(client.name||'este asistente')+'</h1><p>Cuenta: '+esc(user.email)+'<br>Cliente: '+esc(client.id)+'</p><p class="nota">No necesitas activar todos los permisos. Se comprobará que esta conexión sigue autorizada antes de guardar. Los nombres los elige cada aplicación.</p>'+PERMISSIONS.map(([id,label])=>'<label class="casilla"><input type="checkbox" data-scope value="'+id+'"><span>'+esc(label)+'</span></label>').join('')+'<label class="casilla"><input type="checkbox" id="confirm"><span>Confirmo que esta es mi cuenta y quiero conceder los permisos seleccionados a esta conexión.</span></label><button class="boton" id="save">Confirmar permisos seleccionados</button><button class="boton secundario" id="cancel">Cancelar</button><p id="message" class="error"></p>');
+ paint('<h1>Elige qué puede hacer '+esc(client.name||'este asistente')+'</h1><p>Cuenta: '+esc(user.email)+'<br>Identificador: '+esc(client.id)+'</p><p class="nota">Activa solo los que necesites.</p>'+PERMISSIONS.map(([id,label])=>'<label class="casilla"><input type="checkbox" data-scope value="'+id+'"><span>'+esc(label)+'</span></label>').join('')+'<label class="casilla"><input type="checkbox" id="confirm"><span>Confirmo que es mi cuenta y concedo estos permisos.</span></label><button class="boton" id="save">Confirmar permisos seleccionados</button><button class="boton secundario" id="cancel">Cancelar</button><p id="message" class="error"></p>');
  document.getElementById('cancel').onclick=cancel;
  document.getElementById('save').onclick=async()=>{
-  const message=document.getElementById('message');if(!document.getElementById('confirm').checked){message.textContent='Confirma tu cuenta y tu decisión antes de guardar.';return;}
+  const message=document.getElementById('message');if(!document.getElementById('confirm').checked){message.textContent='Marca la casilla de confirmación.';return;}
   const scopes=[...screen.querySelectorAll('[data-scope]:checked')].map(x=>x.value);
-  if(!scopes.length){message.textContent='Selecciona al menos un permiso o pulsa Cancelar.';return;}
+  if(!scopes.length){message.textContent='Selecciona al menos un permiso o selecciona Cancelar.';return;}
   screen.querySelectorAll('button,input').forEach(x=>x.disabled=true);
-  try{const result=await recovery.save(scopes,displayedIdentity);if(result.status==='existing')return management();paint('<h1>Permisos guardados</h1><p>Ya puedes volver al asistente conectado. No hemos cambiado ni revocado tu autorización OAuth.</p>');}catch(e){error(e);}
+  try{const result=await recovery.save(scopes,displayedIdentity);if(result.status==='existing')return management();paint('<h1>Permisos guardados</h1><p>Ya puedes volver a tu asistente.</p>');}catch(e){error(e);}
  };
 }
 supabase.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'||event==='SIGNED_IN'){recovery.cancel();}});
