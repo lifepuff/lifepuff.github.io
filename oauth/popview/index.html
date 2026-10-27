@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>Abrir PopView</title>
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<main class="caja">
+  <div class="marca">PopView</div>
+  <h1 id="titulo">Abriendo PopView.</h1>
+  <p class="ayuda" id="ayuda">Si no se abre automáticamente, selecciona el botón.</p>
+  <a id="ir" class="boton" hidden>Abrir PopView</a>
+</main>
+<script type="module">
+import { runBridge } from './bridge.mjs';
+runBridge(window.location, document);
+</script>
+</body>
+</html>

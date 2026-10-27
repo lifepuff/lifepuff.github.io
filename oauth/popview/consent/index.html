@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>Permitir acceso · PopView</title>
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<main class="caja" aria-live="polite">
+  <div class="marca">PopView</div>
+  <div id="pantalla"><p class="ayuda">Cargando…</p></div>
+  <div id="respaldo" hidden>
+    <h1>La página no termina de cargar</h1>
+    <p class="ayuda">Puede ser un problema de conexión o del navegador que abrió tu asistente.</p>
+    <button id="reintentar" class="boton" type="button">Reintentar</button>
+    <p class="nota">Si sigue sin cargar, abre esta página en Chrome. <a id="abrir-chrome" href="#" target="_blank" rel="noopener noreferrer">Abrir en el navegador</a> · <a id="copiar-enlace" href="#">Copiar el enlace</a></p>
+    <p id="copiado" class="nota" hidden>Enlace copiado. Pégalo en Chrome.</p>
+  </div>
+</main>
+
+<script>
+// Fuera del módulo a propósito: si la librería no llega, esto sigue funcionando.
+(function () {
+  var respaldo = document.getElementById('respaldo');
+  var abrir = document.getElementById('abrir-chrome');
+  abrir.href = location.href;
+  window.__lpCargada = function () { clearTimeout(window.__lpTemporizador); };
+  window.__lpTemporizador = setTimeout(function () {
+    document.getElementById('pantalla').hidden = true;
+    respaldo.hidden = false;
+  }, 10000);
+  document.getElementById('reintentar').addEventListener('click', function () { location.reload(); });
+  document.getElementById('copiar-enlace').addEventListener('click', function (e) {
+    e.preventDefault();
+    var aviso = document.getElementById('copiado');
+    function hecho() { aviso.hidden = false; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(location.href).then(hecho, function () { window.prompt('Copia este enlace:', location.href); });
+    } else {
+      window.prompt('Copia este enlace:', location.href);
+    }
+  });
+})();
+</script>
+
+<script type="module" src="/oauth/consent/consent.mjs"></script>
+</body>
+</html>
